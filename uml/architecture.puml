@@ -1,0 +1,22 @@
+
+@startuml
+title Batch Processing System - Sequence Diagram
+
+actor "Data Source" as User
+participant "Kafka" as Kafka
+participant "HDFS" as HDFS
+participant "Spark" as Spark
+participant "PostgreSQL" as Postgres
+participant "Airflow" as Airflow
+participant "ML Model" as ML
+
+User -> Kafka : Send CSV File (monthly)
+Kafka -> HDFS : Write to storage
+
+Airflow -> Spark : Trigger batch job
+Spark -> HDFS : Read raw data
+Spark -> Spark : Clean & aggregate
+Spark -> Postgres : Write aggregated results
+
+ML -> Postgres : Query aggregated data
+@enduml

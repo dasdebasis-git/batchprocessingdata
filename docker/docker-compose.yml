@@ -1,0 +1,116 @@
+
+version: '3.8'
+
+services:
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: bitnami/kafka:3.4.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_ENABLE_KRAFT=no                # ✅ Must explicitly disable KRaft (the KEY fix)
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
+
+
+  hdfs:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    environment:
+      - CLUSTER_NAME=test
+    ports:
+      - "9870:9870"
+
+  spark:
+    image: bitnami/spark:latest
+    environment:
+      - SPARK_CLASSPATH=/opt/bitnami/spark/jars/postgresql-42.7.3.jar
+    volumes:
+      - ../spark:/spark
+      - ../data:/data
+      - ./drivers/postgresql-42.7.3.jar:/opt/bitnami/spark/jars/postgresql-42.7.3.jar
+
+
+  postgres:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  airflow-web:
+    image: apache/airflow:2.7.0
+    user: "0:0"
+    container_name: airflow-web
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__WEBSERVER__SECRET_KEY=7i_BEzDNypI8zf13FTycwubFnkiibp4_qg_XusbGcXc
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__FERNET_KEY=qG00Ypg_6jBmI3yxzg7rIl1UjlBFXCgU1TgpQf2IG_k=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    volumes:
+      - ../airflow:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create --username admin --firstname Air --lastname Flow --role Admin --email admin@example.com --password admin &&
+      airflow webserver
+      "
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.0
+    user: "0:0"
+    container_name: airflow-scheduler
+    restart: always
+    depends_on:
+      - postgres
+      - airflow-web
+    environment:
+      - AIRFLOW__WEBSERVER__SECRET_KEY=7i_BEzDNypI8zf13FTycwubFnkiibp4_qg_XusbGcXc
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__FERNET_KEY=qG00Ypg_6jBmI3yxzg7rIl1UjlBFXCgU1TgpQf2IG_k=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    volumes:
+      - ../airflow:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    command: >
+      bash -c "
+      sleep 10 &&
+      airflow db upgrade &&
+      airflow scheduler
+      "
+  airflow-triggerer:
+    image: apache/airflow:2.7.0
+    environment:
+      - AIRFLOW__WEBSERVER__SECRET_KEY=7i_BEzDNypI8zf13FTycwubFnkiibp4_qg_XusbGcXc
+
+volumes:
+  postgres_data:
+
