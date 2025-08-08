@@ -1,0 +1,39 @@
+@startuml
+title Batch-Processing-Based Data Architecture
+
+actor "Data Source (External Systems)" as User
+
+package "Data Ingestion Layer" {
+    [Apache Kafka]
+}
+
+package "Data Storage Layer" {
+    [Hadoop HDFS]
+}
+
+package "Data Processing Layer" {
+    [Apache Spark]
+}
+
+package "Data Aggregation & Storage" {
+    [PostgreSQL]
+}
+
+package "Orchestration Layer" {
+    [Apache Airflow]
+}
+
+package "ML Application (Frontend)" {
+    [Machine Learning Model Consumer]
+}
+
+User --> [Apache Kafka] : Data Ingestion
+[Apache Kafka] --> [Hadoop HDFS] : Raw Data Storage
+[Hadoop HDFS] --> [Apache Spark] : Pre-processing & Aggregation
+[Apache Spark] --> [PostgreSQL] : Aggregated Data Storage
+[PostgreSQL] --> [Machine Learning Model Consumer] : Data Delivery
+[Apache Airflow] --> [Apache Kafka] : Workflow Trigger
+[Apache Airflow] --> [Apache Spark] : Workflow Trigger
+[Apache Airflow] --> [PostgreSQL] : Workflow Trigger
+
+@enduml
